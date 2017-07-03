@@ -2,6 +2,8 @@
 #include <iomanip>
 #include <math.h>
 #include <vector>
+#include <algorithm>
+#include <iterator>
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/polygon.hpp>
 #include <boost/geometry/geometries/linestring.hpp>
@@ -13,14 +15,20 @@ typedef boost::geometry::model::d2::point_xy<int> point_i;
 typedef boost::geometry::model::linestring<point_i> linestring;
 typedef boost::geometry::model::polygon<point_i> polygon_i;
 
-struct Triangle{
-    int line1;
-    int line2;
-    double angle;
-    bool depression;
-};
-
 bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
+
+    struct Triangle{
+        int line1;
+        int line2;
+        double angle;
+        bool depression;
+    };
+
+    struct IntAndBool{
+        int a;
+        bool b;
+    };
+
     auto sumSquare=[](point_i point1,point_i point2)
     {
         int x_2=pow(point1.x()-point2.x(),2.0);
@@ -72,7 +80,7 @@ bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
         return v;
     };
 
-    auto equalsTriangles=[](Triangle triangleA,Triangle triangleB){
+    auto equalsTriangles1=[](Triangle triangleA,Triangle triangleB){
         bool a=triangleA.line1==triangleB.line1;
         bool b=triangleA.line2==triangleB.line2;
         bool c=triangleA.angle==triangleB.angle;
@@ -88,52 +96,44 @@ bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
         return a&&b&&c&&d;
     };
 
-    //vectorAの中にtriangleAと同じものは何番目に入っているか(戻り値std::vector<int>)
-    auto countSameTriangles1=[equalsTriangles](Triangle triangleA,std::vector<Triangle> vectorA){
-        bool et1;
-        int count=0;
-        std::vector<int> v;
-        for(Triangle t:vectorA){
-            et1=equalsTriangles(triangleA,t);
-            if(et1) v.push_back(count);
-            count++;
+    auto isThereTriangle=[equalsTriangles1,equalsTriangles2](Triangle triangle,std::vector<Triangle> vectorA){
+        std::vector<IntAndBool> v;
+        int size=vectorA.size();
+        for(int i=0;i<size;i++){
+            bool et1=equalsTriangles1(triangle,vectorA.at(i));
+            bool et2=equalsTriangles2(triangle,vectorA.at(i));
+            if(et1||et2) v.push_back({i,et1});
         }
         return v;
     };
 
-    //vectorAの中にtriangleAと同じものは何番目に入っているか(戻り値std::vector<int>)
-    auto countSameTriangles2=[equalsTriangles2](Triangle triangleA,std::vector<Triangle> vectorA){
-        bool et2;
-        int count=0;
-        std::vector<int> v;
-        for(Triangle t:vectorA){
-            et2=equalsTriangles2(triangleA,t);
-            if(et2) v.push_back(count);
-            count++;
+    auto equalsVector=[equalsTriangles1,equalsTriangles2](std::vector<Triangle> vectorA,std::vector<Triangle> vectorB, bool forward){
+        if(vectorA.size()!=vectorB.size()) return false;
+        int size=vectorA.size();
+        for(int i=0;i<size;i++){
+            if(forward){
+                if(!equalsTriangles1(vectorA.at(i),vectorB.at(i))) return false;
+            }else{
+                if(!equalsTriangles2(vectorA.at(i),vectorB.at(size-i-1))) return false;
+            }
         }
-        return v;
+        return true;
     };
 
-    auto equalsTriangleVectors=[equalsTriangles,equalsTriangles2,countSameTriangles1,countSameTriangles2](std::vector<Triangle> vectorA,std::vector<Triangle> vectorB){
-        std::vector<int> v=countSameTriangles1(vectorA.at(0),vectorB);
-        std::vector<int> v2=countSameTriangles2(vectorA.at(0),vectorB);
-        for(int i=0;i<v.size()-1;i++){
-            int a=v.at(i);
-            int count=0;
-            for(int j=0;j<vectorA.size()-1;j++,a++){
-                if(vectorB.size()<=a) a=0;
-                if(equalsTriangles(vectorA.at(j),vectorB.at(a))) count++;
+    auto equalsTriangleVectors=[equalsTriangles1,equalsTriangles2,isThereTriangle,equalsVector](std::vector<Triangle> vectorA,std::vector<Triangle> vectorB){
+        if(vectorA.size()!=vectorB.size()) return false;
+        std::vector<IntAndBool> v=isThereTriangle(vectorA.at(0),vectorB);
+        for(int i=0;i<v.size();i++){
+            IntAndBool intandbool=v.at(i);
+            int a=intandbool.a;
+            bool b=intandbool.b;
+            if(!b) a++;
+            for(int j=0;j<a;j++){
+                Triangle temporary=vectorB.at(0);
+                vectorB.erase(vectorB.begin());
+                vectorB.push_back(temporary);
             }
-            if(count==vectorA.size()-1)return true;
-        }
-        for(int i=0;i<v2.size()-1;i++){
-            int a=v2.at(i);
-            int count=0;
-            for(int j=0;j<vectorA.size()-1;j++,a++){
-                if(vectorB.size()<=a) a=0;
-                if(equalsTriangles2(vectorA.at(j),vectorB.at(a))) count++;
-            }
-            if(count==vectorA.size()-1)return true;
+            if(equalsVector(vectorA,vectorB,b)) return true;
         }
         return false;
     };
@@ -157,23 +157,17 @@ int main()
             ;
     polygon_i poly2;
     exterior_ring(poly2) = boost::assign::list_of<point_i>
-            (5, 2)
-            (3, 4)
-            (-4, 5)
-            (1, -2)
-            (3, 1)
-            (5, 2)
+            (1, 2)
+            (-4, -5)
+            (3, -4)
+            (5, -2)
+            (3, -1)
+            (1, 2)
             ;
-    polygon_i poly3;
-    exterior_ring(poly3) = boost::assign::list_of<point_i>
-            (5, 2)
-            (3, 1)
-            (1, -2)
-            (-4, 5)
-            (3, 4)
-            (5, 2)
-            ;
-    bool a=IsCongruence(poly,poly3);
+    reverse(poly2);
+    bool a=IsCongruence(poly,poly2);
+    std::cout<<dsv(poly)<<std::endl;
+    std::cout<<dsv(poly2)<<std::endl;
     std::cout << a << std::endl;
     return 0;
 }

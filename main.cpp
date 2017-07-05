@@ -10,54 +10,57 @@
 #include <boost/geometry/geometries/point_xy.hpp>
 #include <boost/assign/list_of.hpp>
 
-using namespace boost::geometry;
 typedef boost::geometry::model::d2::point_xy<int> point_i;
 typedef boost::geometry::model::linestring<point_i> linestring;
 typedef boost::geometry::model::polygon<point_i> polygon_i;
-
+//合同判定のメソッド
 bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
-
+    //三角形を表す構造体
     struct Triangle{
         int line1;
         int line2;
         double angle;
         bool depression;
     };
-
+    //intとboolを返すためだけに作った構造体
     struct IntAndBool{
         int a;
         bool b;
     };
+    //polygonの辺によって作られる三角形のvectorを返す
+    auto getTriangles=[](polygon_i polygonA){
 
-    auto sumSquare=[](point_i point1,point_i point2)
-    {
-        int x_2=pow(point1.x()-point2.x(),2.0);
-        int y_2=pow(point1.y()-point2.y(),2.0);
-        return x_2+y_2;
-    };
+        //point_xyを2つ受け取り、線の長さの2乗を返す
+        auto sumSquare=[](point_i point1,point_i point2)
+        {
+            int x_2=pow(point1.x()-point2.x(),2.0);
+            int y_2=pow(point1.y()-point2.y(),2.0);
+            return x_2+y_2;
+        };
 
-    auto computeAngle=[](point_i pointA,point_i pointB,point_i pointC){
-       int a1,a2,b1,b2;
-       a1=pointA.x()-pointB.x();
-       a2=pointA.y()-pointB.y();
-       b1=pointC.x()-pointB.x();
-       b2=pointC.y()-pointB.y();
-       double bunshi=a1*b1+a2*b2;
-       double bunbo=sqrt(pow(a1,2)+pow(a2,2))*sqrt(pow(b1,2)+pow(b2,2));
-       return acos(bunshi/bunbo);
-   };
+        //三点を受け取りpointBにできる角度を返す(rad)
+        auto computeAngle=[](point_i pointA,point_i pointB,point_i pointC){
+           int a1,a2,b1,b2;
+           a1=pointA.x()-pointB.x();
+           a2=pointA.y()-pointB.y();
+           b1=pointC.x()-pointB.x();
+           b2=pointC.y()-pointB.y();
+           double bunshi=a1*b1+a2*b2;
+           double bunbo=sqrt(pow(a1,2)+pow(a2,2))*sqrt(pow(b1,2)+pow(b2,2));
+           return acos(bunshi/bunbo);
+       };
 
-    auto isDepression=[](polygon_i polygonA,int number){
-        point_i removepoint=polygonA.outer().at(number);
-        polygonA.outer().erase(polygonA.outer().begin()+number);
-        if(number==0){
-            polygonA.outer().erase(polygonA.outer().end()-1);
-            polygonA.outer().push_back(polygonA.outer().at(0));
-        }
-        return !disjoint(polygonA,removepoint);
-    };
+        //polygonの中のnumber番目の点によってpolygonは凹がたになっているかどうか
+        auto isDepression=[](polygon_i polygonA,int number){
+            point_i removepoint=polygonA.outer().at(number);
+            polygonA.outer().erase(polygonA.outer().begin()+number);
+            if(number==0){
+                polygonA.outer().erase(polygonA.outer().end()-1);
+                polygonA.outer().push_back(polygonA.outer().at(0));
+            }
+            return !boost::geometry::disjoint(polygonA,removepoint);
+        };
 
-    auto getTriangles=[sumSquare,computeAngle,isDepression](polygon_i polygonA){
         std::vector<point_i> polygonAvector=polygonA.outer();
         int serchNumber=polygonAvector.size()-2;
 
@@ -74,12 +77,13 @@ bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
                 }
             );
         }
-        for(Triangle t:v){
-            std::cout<<"line1:"<<std::setw(2)<<t.line1<<" line2:"<<std::setw(2)<<t.line2<<" angle:"<<t.angle<<" depression:"<<t.depression<<std::endl;
-        }
+//        for(Triangle t:v){
+//            std::cout<<"line1:"<<std::setw(2)<<t.line1<<" line2:"<<std::setw(2)<<t.line2<<" angle:"<<t.angle<<" depression:"<<t.depression<<std::endl;
+//        }
         return v;
     };
 
+    //Triangleを２つ受け取り合同かどうか返す
     auto equalsTriangles1=[](Triangle triangleA,Triangle triangleB){
         bool a=triangleA.line1==triangleB.line1;
         bool b=triangleA.line2==triangleB.line2;
@@ -88,6 +92,7 @@ bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
         return a&&b&&c&&d;
     };
 
+    //Triangleを２つ受け取り合同かどうか返す(equalsTrianglesとlineの判定が逆)
     auto equalsTriangles2=[](Triangle triangleA,Triangle triangleB){
         bool a=triangleA.line1==triangleB.line2;
         bool b=triangleA.line2==triangleB.line1;
@@ -96,6 +101,7 @@ bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
         return a&&b&&c&&d;
     };
 
+    //vector<Triangle>の中に引数のtriangleはどこにあるのかvector<int>で返す
     auto isThereTriangle=[equalsTriangles1,equalsTriangles2](Triangle triangle,std::vector<Triangle> vectorA){
         std::vector<IntAndBool> v;
         int size=vectorA.size();
@@ -107,6 +113,7 @@ bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
         return v;
     };
 
+    //vector<Triangle>を２つ受け取りまったく同じものが入っているか判定(逆回りも考えた)
     auto equalsVector=[equalsTriangles1,equalsTriangles2](std::vector<Triangle> vectorA,std::vector<Triangle> vectorB, bool forward){
         if(vectorA.size()!=vectorB.size()) return false;
         int size=vectorA.size();
@@ -120,6 +127,8 @@ bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
         return true;
     };
 
+    //本命のメソッド
+    //vector<Triangle>を２つ受け取り合同かそれらによって作られる多角形が合同かどうか判定
     auto equalsTriangleVectors=[equalsTriangles1,equalsTriangles2,isThereTriangle,equalsVector](std::vector<Triangle> vectorA,std::vector<Triangle> vectorB){
         if(vectorA.size()!=vectorB.size()) return false;
         std::vector<IntAndBool> v=isThereTriangle(vectorA.at(0),vectorB);
@@ -147,27 +156,25 @@ bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
 int main()
 {
     polygon_i poly;
-    exterior_ring(poly) = boost::assign::list_of<point_i>
-            (3, 4)
+    boost::geometry::exterior_ring(poly) = boost::assign::list_of<point_i>
             (5, 2)
             (3, 1)
             (1, -2)
             (-4, 5)
-            (3, 4)
+            (5, 2)
             ;
     polygon_i poly2;
-    exterior_ring(poly2) = boost::assign::list_of<point_i>
+    boost::geometry::exterior_ring(poly2) = boost::assign::list_of<point_i>
             (1, 2)
             (-4, -5)
-            (3, -4)
             (5, -2)
             (3, -1)
             (1, 2)
             ;
-    reverse(poly2);
+    boost::geometry::reverse(poly2);
     bool a=IsCongruence(poly,poly2);
-    std::cout<<dsv(poly)<<std::endl;
-    std::cout<<dsv(poly2)<<std::endl;
+    std::cout<<boost::geometry::dsv(poly)<<std::endl;
+    std::cout<<boost::geometry::dsv(poly2)<<std::endl;
     std::cout << a << std::endl;
     return 0;
 }

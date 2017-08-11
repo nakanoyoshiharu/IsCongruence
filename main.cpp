@@ -24,11 +24,6 @@ bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
         bool depression;
     };
 
-    struct IntAndBool{
-        int a;
-        bool b;
-    };
-
     auto sumSquare=[](point_i point1,point_i point2)
     {
         int x_2=pow(point1.x()-point2.x(),2.0);
@@ -74,9 +69,6 @@ bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
                 }
             );
         }
-        for(Triangle t:v){
-            std::cout<<"line1:"<<std::setw(2)<<t.line1<<" line2:"<<std::setw(2)<<t.line2<<" angle:"<<t.angle<<" depression:"<<t.depression<<std::endl;
-        }
         return v;
     };
 
@@ -97,12 +89,12 @@ bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
     };
 
     auto isThereTriangle=[equalsTriangles1,equalsTriangles2](Triangle triangle,std::vector<Triangle> vectorA){
-        std::vector<IntAndBool> v;
+        std::vector<std::pair<int , bool>> v;
         int size=vectorA.size();
         for(int i=0;i<size;i++){
             bool et1=equalsTriangles1(triangle,vectorA.at(i));
             bool et2=equalsTriangles2(triangle,vectorA.at(i));
-            if(et1||et2) v.push_back({i,et1});
+            if(et1||et2) v.push_back(std::pair<int , bool>(i , et1));
         }
         return v;
     };
@@ -122,11 +114,11 @@ bool IsCongruence(polygon_i polygon1,polygon_i polygon2){
 
     auto equalsTriangleVectors=[equalsTriangles1,equalsTriangles2,isThereTriangle,equalsVector](std::vector<Triangle> vectorA,std::vector<Triangle> vectorB){
         if(vectorA.size()!=vectorB.size()) return false;
-        std::vector<IntAndBool> v=isThereTriangle(vectorA.at(0),vectorB);
+        std::vector<std::pair<int , bool>> v=isThereTriangle(vectorA.at(0),vectorB);
         for(int i=0;i<v.size();i++){
-            IntAndBool intandbool=v.at(i);
-            int a=intandbool.a;
-            bool b=intandbool.b;
+            std::pair<int , bool> intandbool=v.at(i);
+            int a=intandbool.first;
+            bool b=intandbool.second;
             if(!b) a++;
             for(int j=0;j<a;j++){
                 Triangle temporary=vectorB.at(0);
@@ -166,8 +158,6 @@ int main()
             ;
     reverse(poly2);
     bool a=IsCongruence(poly,poly2);
-    std::cout<<dsv(poly)<<std::endl;
-    std::cout<<dsv(poly2)<<std::endl;
     std::cout << a << std::endl;
     return 0;
 }
